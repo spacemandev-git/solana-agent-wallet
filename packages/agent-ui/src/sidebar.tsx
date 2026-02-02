@@ -4,20 +4,34 @@ import type { NetworkOption } from './components/network-switch.tsx'
 import { NetworkSwitch } from './components/network-switch.tsx'
 import type { PendingRequest } from './components/request-panel.tsx'
 import { RequestPanel } from './components/request-panel.tsx'
+import { RpcEndpoint } from './components/rpc-endpoint.tsx'
+import type { TokenInfo } from './components/send-tokens.tsx'
+import { SendTokens } from './components/send-tokens.tsx'
 import { VaultUnlock } from './components/vault-unlock.tsx'
 import { WalletCreate } from './components/wallet-create.tsx'
 import { WalletStatus } from './components/wallet-status.tsx'
 
 export interface AgentSidebarApi {
   approveRequest: () => void
-  createWallet: (password: string, mnemonic: string) => Promise<{ publicKey: string }>
+  createWallet: (password: string, mnemonic: string) => Promise<{ mnemonic?: string; publicKey: string }>
   getAddress: () => Promise<string | null>
   getBalance: () => Promise<string | null>
   getNetwork: () => Promise<string>
   getNetworks: () => Promise<NetworkOption[]>
+  getRpcEndpoint: () => Promise<string>
+  getTokenBalances: () => Promise<TokenInfo[]>
   getVaultStatus: () => Promise<{ hasVault: boolean; locked: boolean }>
   rejectRequest: () => void
+  sendSol: (params: { recipient: string; amount: string }) => Promise<string>
+  sendSplToken: (params: {
+    recipient: string
+    mint: string
+    amount: string
+    decimals: number
+    tokenProgram?: string
+  }) => Promise<string>
   setNetwork: (id: string) => Promise<void>
+  setRpcEndpoint: (url: string) => Promise<void>
   unlockVault: (password: string) => Promise<void>
 }
 
@@ -33,9 +47,11 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
   const [network, setNetwork] = useState('Mainnet')
   const [networkId, setNetworkId] = useState('networkMainnet')
   const [networks, setNetworks] = useState<NetworkOption[]>([])
+  const [rpcEndpoint, setRpcEndpoint] = useState('')
   const [vaultLocked, setVaultLocked] = useState(true)
   const [hasVault, setHasVault] = useState(false)
   const [request, setRequest] = useState<PendingRequest | null>(null)
+  const [tokens, setTokens] = useState<TokenInfo[]>([])
   const creatingRef = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -47,16 +63,20 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
       }
 
       if (!status.locked) {
-        const [addr, bal, net, nets] = await Promise.all([
+        const [addr, bal, net, nets, rpc, toks] = await Promise.all([
           api.getAddress(),
           api.getBalance(),
           api.getNetwork(),
           api.getNetworks(),
+          api.getRpcEndpoint(),
+          api.getTokenBalances().catch(() => [] as TokenInfo[]),
         ])
         setAddress(addr)
         setBalance(bal)
         setNetwork(net)
         setNetworks(nets)
+        setRpcEndpoint(rpc)
+        setTokens(toks)
       }
     } catch {
       // Silently fail during refresh - vault might be initializing
@@ -108,6 +128,37 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
     void refresh()
   }, [refresh])
 
+  const handleRpcChange = useCallback(
+    async (url: string) => {
+      await api.setRpcEndpoint(url)
+      setRpcEndpoint(url)
+      await refresh()
+    },
+    [api, refresh],
+  )
+
+  const handleSend = useCallback(
+    async (params: { amount: string; decimals: number; mint: string; recipient: string; tokenProgram?: string }) => {
+      let sig: string
+      if (params.mint === 'SOL') {
+        sig = await api.sendSol({ amount: params.amount, recipient: params.recipient })
+      } else {
+        const splParams: { recipient: string; mint: string; amount: string; decimals: number; tokenProgram?: string } =
+          {
+            amount: params.amount,
+            decimals: params.decimals,
+            mint: params.mint,
+            recipient: params.recipient,
+          }
+        if (params.tokenProgram) splParams.tokenProgram = params.tokenProgram
+        sig = await api.sendSplToken(splParams)
+      }
+      void refresh()
+      return sig
+    },
+    [api, refresh],
+  )
+
   const handleApprove = useCallback(() => {
     api.approveRequest()
     setRequest(null)
@@ -147,8 +198,10 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
       </div>
       <div className="sidebar-body">
         <WalletStatus address={address} balance={balance} network={network} />
+        <SendTokens onSend={handleSend} tokens={tokens} />
         <RequestPanel onApprove={handleApprove} onReject={handleReject} request={request} />
         <NetworkSwitch networks={networks} onChange={handleNetworkChange} selected={networkId} />
+        <RpcEndpoint onChange={handleRpcChange} value={rpcEndpoint} />
       </div>
     </aside>
   )

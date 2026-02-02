@@ -1,10 +1,10 @@
-import { createSolanaRpc } from '@solana/kit'
 import { AgentSidebar } from '@workspace/agent-ui'
 import type { PendingRequest } from '@workspace/agent-ui/components/request-panel'
 import type { AgentSidebarApi } from '@workspace/agent-ui/sidebar'
 import { sidebarStyles } from '@workspace/agent-ui/styles'
 import { onMessage, sendMessage } from '@workspace/background/extension'
 import { getDbService } from '@workspace/background/services/db'
+import { generateMnemonic } from '@workspace/keypair/generate-mnemonic'
 import { createRoot } from 'react-dom/client'
 
 export default defineContentScript({
@@ -33,17 +33,6 @@ export default defineContentScript({
     })
 
     const api: AgentSidebarApi = {
-      createWallet: async (password: string, mnemonic: string) => {
-        await getDbService().wallet.createWithAccount({
-          derivationPath: `m/44'/501'/0'/0'`,
-          mnemonic: mnemonic.trim(),
-          name: 'Agent Wallet',
-          secret: password,
-        })
-        await sendMessage('vaultUnlock', password)
-        const account = await getDbService().account.active()
-        return { publicKey: account.publicKey }
-      },
       approveRequest: () => {
         const type = pendingRequestType
         if (!type) return
@@ -51,17 +40,21 @@ export default defineContentScript({
         void (async () => {
           try {
             const { getAgentRequestService } = await import('../services/agent-request.ts')
-            const service = getAgentRequestService()
+            const { getAgentSignService } = await import('../services/agent-sign.ts')
+            const requestService = getAgentRequestService()
+            const signService = getAgentSignService()
 
             if (type === 'connect') {
               const accounts = await getDbService().account.walletAccounts()
-              await service.resolve(accounts)
+              await requestService.resolve(accounts)
             } else {
-              const request = await service.get()
+              const request = await requestService.get()
               if (request) {
-                const data = (request as unknown as { data: unknown }).data
-                const result = await sendMessage(type as 'signAndSendTransaction', data as never)
-                await service.resolve(result as never)
+                const data = request.data as never
+                // Call the sign service directly instead of sending a message
+                // to background (which would create a new request).
+                const result = await signService[type as keyof typeof signService](data)
+                await requestService.resolve(result as never)
               }
             }
           } catch {
@@ -69,6 +62,18 @@ export default defineContentScript({
           }
         })()
         pendingRequestType = null
+      },
+      createWallet: async (password: string, mnemonic: string) => {
+        const actualMnemonic = mnemonic.trim() || generateMnemonic()
+        await getDbService().wallet.createWithAccount({
+          derivationPath: `m/44'/501'/0'/0'`,
+          mnemonic: actualMnemonic,
+          name: 'Agent Wallet',
+          secret: password,
+        })
+        await sendMessage('vaultUnlock', password)
+        const account = await getDbService().account.active()
+        return { mnemonic: actualMnemonic, publicKey: account.publicKey }
       },
       getAddress: async () => {
         try {
@@ -80,12 +85,7 @@ export default defineContentScript({
       },
       getBalance: async () => {
         try {
-          const endpoint = await getDbService().network.activeEndpoint()
-          const account = await getDbService().account.active()
-          const rpc = createSolanaRpc(endpoint)
-          const { value } = await rpc.getBalance(account.publicKey as Parameters<typeof rpc.getBalance>[0]).send()
-          const sol = Number(value) / 1_000_000_000
-          return sol.toFixed(4)
+          return await sendMessage('getBalance', undefined)
         } catch {
           return null
         }
@@ -108,6 +108,20 @@ export default defineContentScript({
         { id: 'networkTestnet', label: 'Testnet' },
         { id: 'networkLocalnet', label: 'Localnet' },
       ],
+      getRpcEndpoint: async () => {
+        try {
+          return await sendMessage('getRpcEndpoint', undefined)
+        } catch {
+          return 'https://solana-rpc.publicnode.com'
+        }
+      },
+      getTokenBalances: async () => {
+        try {
+          return await sendMessage('getTokenBalances', undefined)
+        } catch {
+          return []
+        }
+      },
       getVaultStatus: async () => {
         try {
           return await sendMessage('vaultStatus', undefined)
@@ -126,13 +140,51 @@ export default defineContentScript({
           }
         })()
       },
+      sendSol: async (params: { recipient: string; amount: string }) => {
+        return await sendMessage('sendSol', params)
+      },
+      sendSplToken: async (params: {
+        recipient: string
+        mint: string
+        amount: string
+        decimals: number
+        tokenProgram?: string
+      }) => {
+        return await sendMessage('sendSplToken', params)
+      },
       setNetwork: async (_id: string) => {
         // Network switching is handled through settings DB
+      },
+      setRpcEndpoint: async (url: string) => {
+        await sendMessage('setRpcEndpoint', url)
       },
       unlockVault: async (password: string) => {
         await sendMessage('vaultUnlock', password)
       },
     }
+
+    // Constrain the page to leave space for the sidebar.
+    // Set explicit widths and clip overflow to prevent page elements
+    // (including position:fixed navbars) from rendering behind the sidebar.
+    const sidebarWidth = 320
+    const pageWidth = `calc(100vw - ${sidebarWidth}px)`
+    const pageStyle = document.createElement('style')
+    pageStyle.textContent = `
+      html:root {
+        overflow-x: hidden !important;
+      }
+      body {
+        width: ${pageWidth} !important;
+        max-width: ${pageWidth} !important;
+        overflow-x: hidden !important;
+        margin-right: 0 !important;
+      }
+      body > *:not(samui-agent-sidebar):not(script):not(style) {
+        max-width: ${pageWidth} !important;
+        overflow-x: hidden !important;
+      }
+    `
+    document.head.appendChild(pageStyle)
 
     const ui = await createShadowRootUi(ctx, {
       name: 'samui-agent-sidebar',
@@ -163,6 +215,7 @@ export default defineContentScript({
       },
       onRemove: (reactRoot) => {
         reactRoot?.unmount()
+        pageStyle.remove()
       },
       position: 'inline',
     })

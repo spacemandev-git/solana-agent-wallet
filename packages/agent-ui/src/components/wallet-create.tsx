@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 export interface WalletCreateProps {
-  onCreate: (password: string, mnemonic: string) => Promise<{ publicKey: string }>
+  onCreate: (password: string, mnemonic: string) => Promise<{ mnemonic?: string; publicKey: string }>
   onContinue: () => void
 }
 
@@ -29,6 +29,7 @@ export function WalletCreate({ onCreate, onContinue }: WalletCreateProps) {
     try {
       const result = await onCreate(password, mnemonic.trim())
       setPublicKey(result.publicKey)
+      if (result.mnemonic) setMnemonic(result.mnemonic)
       setStatus('done')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create wallet')

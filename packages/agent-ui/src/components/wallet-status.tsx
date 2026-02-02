@@ -39,7 +39,19 @@ export function WalletStatus({ address, balance, network }: WalletStatusProps) {
           </div>
           <div style={{ marginBottom: '8px' }}>
             <output aria-label={`SOL balance: ${balance ?? '0'}`} className="balance">
-              {balance ?? '0'}
+              {(() => {
+                const b = balance ?? '0'
+                const dotIdx = b.indexOf('.')
+                if (dotIdx === -1) return b
+                const whole = b.slice(0, dotIdx)
+                const decimals = b.slice(dotIdx + 1).slice(0, 8)
+                return (
+                  <>
+                    {whole}
+                    <span style={{ fontSize: '14px', fontWeight: 400 }}>.{decimals}</span>
+                  </>
+                )
+              })()}
             </output>
             <span className="balance-unit">SOL</span>
           </div>

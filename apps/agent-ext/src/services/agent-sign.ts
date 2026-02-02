@@ -44,7 +44,11 @@ async function getDecryptedSecretKeyBytes(): Promise<Uint8Array> {
 }
 
 async function getActiveRpcUrl(): Promise<string> {
-  return getDbService().network.activeEndpoint()
+  const endpoint = await getDbService().network.activeEndpoint()
+  // Solana's public mainnet-beta RPC returns 403 from extension origins.
+  // Fall back to publicnode which allows extension requests.
+  if (endpoint.includes('mainnet-beta')) return 'https://solana-rpc.publicnode.com'
+  return endpoint
 }
 
 export const [registerAgentSignService, getAgentSignService] = defineProxyService('SignService', () => ({

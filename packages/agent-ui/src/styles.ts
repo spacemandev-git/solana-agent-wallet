@@ -251,4 +251,17 @@ export const sidebarStyles = `
     padding: 24px 0;
     font-size: 13px;
   }
+
+  .success-msg {
+    font-size: 12px;
+    color: #4ade80;
+    word-break: break-all;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .error-msg {
+    font-size: 12px;
+    color: #f87171;
+    word-break: break-all;
+  }
 `

@@ -14,6 +14,7 @@ import { accountFindUnique } from '@workspace/db/account/account-find-unique'
 import { accountReadSecretKey } from '@workspace/db/account/account-read-secret-key'
 import { db } from '@workspace/db/db'
 import { networkFindUnique } from '@workspace/db/network/network-find-unique'
+import { networkUpdate } from '@workspace/db/network/network-update'
 import { settingFindUnique } from '@workspace/db/setting/setting-find-unique'
 import { walletCreate } from '@workspace/db/wallet/wallet-create'
 import type { WalletCreateInput } from '@workspace/db/wallet/wallet-create-input'
@@ -76,6 +77,11 @@ export const [registerDbService, getDbService] = defineProxyService('DbService',
         }
       }
       return 'https://api.mainnet-beta.solana.com'
+    },
+    setEndpoint: async (url: string): Promise<void> => {
+      const activeNetworkId = (await settingFindUnique(db, 'activeNetworkId'))?.value
+      if (!activeNetworkId) throw new Error('No active network set')
+      await networkUpdate(db, activeNetworkId, { endpoint: url })
     },
   },
   wallet: {

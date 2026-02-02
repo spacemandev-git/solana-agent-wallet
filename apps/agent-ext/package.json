@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "@solana-program/system": "catalog:",
+    "@solana-program/token": "catalog:",
+    "@solana-program/token-2022": "catalog:",
     "@solana/kit": "catalog:",
     "@solana/wallet-standard-features": "1.3.0",
     "@solana/wallet-standard-util": "1.1.2",
@@ -10,6 +13,7 @@
     "@workspace/db": "workspace:*",
     "@workspace/env": "workspace:*",
     "@workspace/keypair": "workspace:*",
+    "@workspace/solana-client": "workspace:*",
     "@workspace/vault": "workspace:*",
     "@workspace/wallet-standard": "workspace:*",
     "react": "catalog:",

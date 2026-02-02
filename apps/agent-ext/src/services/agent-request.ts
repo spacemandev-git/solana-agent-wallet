@@ -11,7 +11,7 @@ import type {
 import type { StandardConnectInput, StandardConnectOutput } from '@wallet-standard/core'
 import { defineProxyService } from '@webext-core/proxy-service'
 
-import { sendMessage } from '@workspace/background/extension'
+import { getDbService } from '@workspace/background/services/db'
 
 type DataType<T extends Request['type']> = Extract<Request, { type: T }>['data']
 
@@ -57,9 +57,33 @@ export type Request =
 class AgentRequestService {
   private request: Request | null = null
 
+  /**
+   * Broadcast a message to all tabs' content scripts via chrome.tabs API.
+   * We cannot use @webext-core/messaging's sendMessage from the background
+   * because its second argument is interpreted as tab/send options, not data.
+   */
+  private async broadcastToTabs(type: string, data?: unknown) {
+    const tabs = await chrome.tabs.query({})
+    const message = { data, id: Math.floor(Math.random() * 10000), timestamp: Date.now(), type }
+    for (const tab of tabs) {
+      if (tab.id != null) {
+        chrome.tabs.sendMessage(tab.id, message).catch(() => {
+          // Tab may not have the content script loaded — ignore
+        })
+      }
+    }
+  }
+
   async create<T extends Request['type']>(type: T, data: DataType<T>): Promise<ResolveType<T>> {
     if (this.request) {
       throw new Error('Request already exists')
+    }
+
+    // Auto-approve connect requests directly in the background.
+    // The agent controls the wallet so there's no need for user confirmation.
+    if (type === 'connect') {
+      const accounts = await getDbService().account.walletAccounts()
+      return { accounts } as ResolveType<T>
     }
 
     return new Promise((resolve, reject) => {
@@ -70,8 +94,8 @@ class AgentRequestService {
         type,
       } as Request
 
-      // Send to content-ui sidebar instead of opening a popup window
-      sendMessage('onRequestCreate', this.request as Request)
+      // Send serializable fields to content-ui sidebar for user approval.
+      this.broadcastToTabs('onRequestCreate', { data, type })
     })
   }
 
@@ -117,11 +141,11 @@ class AgentRequestService {
 
   reset() {
     this.request = null
-    sendMessage('onRequestReset')
+    this.broadcastToTabs('onRequestReset')
   }
 }
 
 export const [registerAgentRequestService, getAgentRequestService] = defineProxyService(
-  'RequestService',
+  'AgentRequestService',
   () => new AgentRequestService(),
 )
