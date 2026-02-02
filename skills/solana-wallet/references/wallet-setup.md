@@ -15,11 +15,11 @@ The profile backup should be at `~/.solana-agent-wallet/browser-profile/`.
 
 ### From GitHub Releases
 
-1. Download `agent-ext.zip` from the latest release
-2. Extract to a directory (e.g., `/tmp/agent-ext`)
+1. Download `agent-ext.zip` from the latest release into the skill directory
+2. Extract next to the SKILL.md (e.g., `skills/solana-wallet/agent-ext/`)
 3. Set the environment variable:
    ```bash
-   export AGENT_BROWSER_EXTENSIONS="/tmp/agent-ext"
+   export AGENT_BROWSER_EXTENSIONS="$SKILL_DIR/agent-ext"
    ```
 
 ### From Source

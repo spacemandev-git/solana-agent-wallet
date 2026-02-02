@@ -137,22 +137,32 @@ Use `--extension <path>` or set `AGENT_BROWSER_EXTENSIONS` to load browser exten
 
 ## Install the wallet extension
 
-Download the pre-built unpacked extension from GitHub releases:
+Download the pre-built unpacked extension from GitHub releases into the skill directory:
 
 ```bash
-# Download the latest release
-curl -L -o agent-ext.zip \
+# SKILL_DIR is the directory containing this SKILL.md file.
+# If you're reading this file, resolve it from the file path:
+SKILL_DIR="$(cd "$(dirname "<path-to-this-SKILL.md>")" && pwd)"
+
+# Download the latest release into the skill directory
+curl -L -o "$SKILL_DIR/agent-ext.zip" \
   https://github.com/spacemandev-git/solana-agent-wallet/releases/latest/download/agent-ext.zip
 
-# Extract to a directory
-mkdir -p /tmp/agent-ext
-unzip -o agent-ext.zip -d /tmp/agent-ext
+# Extract next to the skill
+mkdir -p "$SKILL_DIR/agent-ext"
+unzip -o "$SKILL_DIR/agent-ext.zip" -d "$SKILL_DIR/agent-ext"
 
 # Set the extension path for agent-browser
-export AGENT_BROWSER_EXTENSIONS="/tmp/agent-ext"
+export AGENT_BROWSER_EXTENSIONS="$SKILL_DIR/agent-ext"
 ```
 
 Releases page: https://github.com/spacemandev-git/solana-agent-wallet/releases
+
+If the extension is already downloaded (the `agent-ext/` directory exists next to this file), skip the download and just set:
+
+```bash
+export AGENT_BROWSER_EXTENSIONS="$SKILL_DIR/agent-ext"
+```
 
 ### Build from source (alternative)
 
@@ -391,12 +401,14 @@ echo "Wallet restored from mnemonic. Profile backed up."
 
 ## Setup from Scratch
 
-For a complete automated setup, use the template script:
+For a complete automated setup, use the template script. It defaults to using the `agent-ext/` directory next to SKILL.md and will download the extension automatically if not present:
 
 ```bash
+./templates/setup-wallet.sh
+# Or specify a custom extension path:
 ./templates/setup-wallet.sh /path/to/agent-ext
-# Optionally pass an existing mnemonic to restore:
-./templates/setup-wallet.sh /path/to/agent-ext "word1 word2 ... word12"
+# Or restore from an existing mnemonic:
+./templates/setup-wallet.sh "$SKILL_DIR/agent-ext" "word1 word2 ... word12"
 ```
 
 ## Security Notes

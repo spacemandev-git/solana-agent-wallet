@@ -34,12 +34,13 @@ The SKILL.md is also included in every [GitHub release](https://github.com/space
 npm install -g agent-browser
 agent-browser install
 
-# 2. Download the wallet extension
-curl -L -o agent-ext.zip \
+# 2. Download the wallet extension (into the skill directory)
+SKILL_DIR="$(pwd)/skills/solana-wallet"  # or wherever SKILL.md lives
+curl -L -o "$SKILL_DIR/agent-ext.zip" \
   https://github.com/spacemandev-git/solana-agent-wallet/releases/latest/download/agent-ext.zip
-mkdir -p /tmp/agent-ext
-unzip -o agent-ext.zip -d /tmp/agent-ext
-export AGENT_BROWSER_EXTENSIONS="/tmp/agent-ext"
+mkdir -p "$SKILL_DIR/agent-ext"
+unzip -o "$SKILL_DIR/agent-ext.zip" -d "$SKILL_DIR/agent-ext"
+export AGENT_BROWSER_EXTENSIONS="$SKILL_DIR/agent-ext"
 
 # 3. Launch browser and set up wallet
 agent-browser open about:blank

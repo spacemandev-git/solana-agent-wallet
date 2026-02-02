@@ -1,15 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./setup-wallet.sh <extension-path> [mnemonic]
-# Example: ./setup-wallet.sh /tmp/agent-ext
-# Example: ./setup-wallet.sh /tmp/agent-ext "word1 word2 ... word12"
+# Usage: ./setup-wallet.sh [extension-path] [mnemonic]
+# Example: ./setup-wallet.sh
+# Example: ./setup-wallet.sh ./agent-ext
+# Example: ./setup-wallet.sh ./agent-ext "word1 word2 ... word12"
+#
+# If no extension path is given, defaults to agent-ext/ next to this script's
+# parent SKILL.md (i.e. the skill directory).
 #
 # If no mnemonic is provided, one will be generated.
 # If a mnemonic is provided, the wallet will be restored from it.
 
-EXTENSION_PATH="${1:?Usage: setup-wallet.sh <extension-path> [mnemonic]}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+EXTENSION_PATH="${1:-$SKILL_DIR/agent-ext}"
 MNEMONIC="${2:-}"
+
+# Download extension if not present
+if [ ! -d "$EXTENSION_PATH" ]; then
+  echo "Extension not found at $EXTENSION_PATH — downloading from GitHub releases..."
+  curl -L -o "$SKILL_DIR/agent-ext.zip" \
+    https://github.com/spacemandev-git/solana-agent-wallet/releases/latest/download/agent-ext.zip
+  mkdir -p "$EXTENSION_PATH"
+  unzip -o "$SKILL_DIR/agent-ext.zip" -d "$EXTENSION_PATH"
+fi
 
 WALLET_DIR="$HOME/.solana-agent-wallet"
 WALLET_CREDENTIALS="$WALLET_DIR/credentials.env"
