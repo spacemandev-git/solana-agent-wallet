@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { NetworkOption } from './components/network-switch.tsx'
 import { NetworkSwitch } from './components/network-switch.tsx'
 import type { PendingRequest } from './components/request-panel.tsx'
 import { RequestPanel } from './components/request-panel.tsx'
 import { VaultUnlock } from './components/vault-unlock.tsx'
+import { WalletCreate } from './components/wallet-create.tsx'
 import { WalletStatus } from './components/wallet-status.tsx'
 
 export interface AgentSidebarApi {
   approveRequest: () => void
+  createWallet: (password: string, mnemonic: string) => Promise<{ publicKey: string }>
   getAddress: () => Promise<string | null>
   getBalance: () => Promise<string | null>
   getNetwork: () => Promise<string>
@@ -34,12 +36,15 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
   const [vaultLocked, setVaultLocked] = useState(true)
   const [hasVault, setHasVault] = useState(false)
   const [request, setRequest] = useState<PendingRequest | null>(null)
+  const creatingRef = useRef(false)
 
   const refresh = useCallback(async () => {
     try {
       const status = await api.getVaultStatus()
       setVaultLocked(status.locked)
-      setHasVault(status.hasVault)
+      if (!creatingRef.current) {
+        setHasVault(status.hasVault)
+      }
 
       if (!status.locked) {
         const [addr, bal, net, nets] = await Promise.all([
@@ -87,6 +92,22 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
     [api, refresh],
   )
 
+  const handleCreate = useCallback(
+    async (password: string, mnemonic: string) => {
+      creatingRef.current = true
+      const result = await api.createWallet(password, mnemonic)
+      return result
+    },
+    [api],
+  )
+
+  const handleContinue = useCallback(() => {
+    creatingRef.current = false
+    setHasVault(true)
+    setVaultLocked(false)
+    void refresh()
+  }, [refresh])
+
   const handleApprove = useCallback(() => {
     api.approveRequest()
     setRequest(null)
@@ -96,6 +117,17 @@ export function AgentSidebar({ api, onRequestCreate, onRequestReset }: AgentSide
     api.rejectRequest()
     setRequest(null)
   }, [api])
+
+  if (!hasVault) {
+    return (
+      <aside aria-label="Solana Wallet" className="sidebar">
+        <div className="sidebar-header">
+          <h2>Samui Agent Wallet</h2>
+        </div>
+        <WalletCreate onContinue={handleContinue} onCreate={handleCreate} />
+      </aside>
+    )
+  }
 
   if (hasVault && vaultLocked) {
     return (

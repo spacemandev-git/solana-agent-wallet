@@ -9,7 +9,7 @@ This is an **agent skill** — a self-contained package that gives an AI agent t
 The skill file ([`skills/solana-wallet/SKILL.md`](skills/solana-wallet/SKILL.md)) contains everything an AI agent needs to:
 
 1. Install `agent-browser` and the wallet extension
-2. Create a wallet with a generated mnemonic
+2. **Create a new wallet** or **import an existing one** from a mnemonic — directly from the sidebar
 3. **Persist the wallet** across browser restarts (profile backup + credential storage)
 4. **Restore a wallet from mnemonic** if all data is lost
 5. Connect to any Solana dApp (Jupiter, Raydium, Marinade, etc.)
@@ -42,14 +42,13 @@ mkdir -p "$SKILL_DIR/agent-ext"
 unzip -o "$SKILL_DIR/agent-ext.zip" -d "$SKILL_DIR/agent-ext"
 export AGENT_BROWSER_EXTENSIONS="$SKILL_DIR/agent-ext"
 
-# 3. Launch browser and set up wallet
+# 3. Launch browser — sidebar shows wallet creation form automatically
 agent-browser open about:blank
 agent-browser wait 2000
-SETUP_URL=$(agent-browser eval "document.querySelector('meta[name=samui-agent-wallet-setup]')?.content")
-agent-browser open "$SETUP_URL"
+agent-browser snapshot -i   # See "Create new wallet" / "Import existing wallet" buttons
 ```
 
-From there, use `agent-browser snapshot -i` to discover interactive elements and fill the setup form. See the full [SKILL.md](skills/solana-wallet/SKILL.md) for detailed workflows.
+The sidebar automatically shows a wallet creation form when no wallet exists. You can create a new wallet or import an existing one from a mnemonic — no need to navigate to any extension pages. Use `agent-browser snapshot -i` to discover the form elements and fill them. See the full [SKILL.md](skills/solana-wallet/SKILL.md) for detailed workflows.
 
 ### Important: Wallet persistence
 
@@ -59,7 +58,7 @@ The browser profile is stored in a **temp directory** that can be wiped on reboo
 - Back up the **browser profile** to `~/.solana-agent-wallet/browser-profile/`
 - Restore the profile before each browser launch
 
-If all data is lost, the wallet can be recreated from the saved mnemonic (same mnemonic = same keypair = same address). See the [SKILL.md](skills/solana-wallet/SKILL.md) "CRITICAL: Wallet Persistence" section for full details.
+If all data is lost, the wallet can be recreated from the saved mnemonic using the sidebar's import mode (same mnemonic = same keypair = same address). See the [SKILL.md](skills/solana-wallet/SKILL.md) "CRITICAL: Wallet Persistence" section for full details.
 
 ## Architecture
 

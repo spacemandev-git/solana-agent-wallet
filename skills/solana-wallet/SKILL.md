@@ -114,7 +114,7 @@ agent-browser install
 ### Verify installation
 
 ```bash
-agent-browser --version
+agent-browser --help
 agent-browser open https://example.com
 agent-browser snapshot -i   # Should print interactive elements with @refs
 agent-browser close
@@ -224,7 +224,7 @@ agent-browser wait 1000
 agent-browser snapshot -i  # Verify: should show wallet address and balance
 ```
 
-If there's no existing wallet (fresh install or lost profile), create one:
+If there's no existing wallet (fresh install or lost profile), the sidebar automatically shows the wallet creation form. Create or import a wallet directly from the sidebar:
 
 ```bash
 # Generate credentials (or use saved mnemonic to restore)
@@ -235,25 +235,38 @@ if [ -z "$WALLET_MNEMONIC" ]; then
   WALLET_MNEMONIC=$(npx -y @scure/bip39 generate 2>/dev/null || npx -y bip39-cli generate 2>/dev/null)
 fi
 
-# Navigate to setup page
-SETUP_URL=$(agent-browser eval "document.querySelector('meta[name=samui-agent-wallet-setup]')?.content")
-agent-browser open "$SETUP_URL"
-agent-browser wait 1000
-
-# Fill setup form (use snapshot to find the actual @refs)
+# The sidebar shows the creation form when no wallet exists.
+# If importing an existing mnemonic, click the "Import" tab first.
 agent-browser snapshot -i
-agent-browser fill @<password-ref> "$WALLET_PASSWORD"
-agent-browser fill @<confirm-ref> "$WALLET_PASSWORD"
-agent-browser fill @<mnemonic-ref> "$WALLET_MNEMONIC"
-agent-browser click @<create-button-ref>
+
+# To import an existing wallet:
+# agent-browser click @<import-tab-ref>    # Click "Import existing wallet" button
+# agent-browser fill @<mnemonic-ref> "$WALLET_MNEMONIC"
+
+# To create a new wallet, stay on the "Create" tab (default).
+# For import, switch to "Import" tab and provide a mnemonic.
+if [ -n "$WALLET_MNEMONIC" ]; then
+  agent-browser click @<import-tab-ref>     # aria-label="Import existing wallet"
+  agent-browser wait 500
+  agent-browser snapshot -i
+  agent-browser fill @<mnemonic-ref> "$WALLET_MNEMONIC"  # aria-label="Wallet mnemonic phrase"
+fi
+
+agent-browser fill @<password-ref> "$WALLET_PASSWORD"        # aria-label="Vault password"
+agent-browser fill @<confirm-ref> "$WALLET_PASSWORD"         # aria-label="Confirm vault password"
+agent-browser click @<create-button-ref>                     # aria-label="Create wallet" or "Import wallet"
 agent-browser wait 3000
 
-# CRITICAL: Read back the mnemonic and public key from the success screen
+# CRITICAL: Read back the public key (and mnemonic if shown) from the success screen
 agent-browser snapshot -i
 # The success screen shows:
 #   - aria-label="Wallet address: <public-key>"  → read the public key
-#   - aria-label="Wallet mnemonic: <words>"       → read the mnemonic to confirm
+#   - aria-label="Wallet mnemonic: <words>"       → read the mnemonic to confirm (import only)
 # Save WALLET_PUBLIC_KEY from the "Wallet address: ..." aria-label value.
+
+# Click "Continue to wallet" to proceed to the main wallet view
+agent-browser click @<continue-ref>   # aria-label="Continue to wallet"
+agent-browser wait 1000
 
 # CRITICAL: Save credentials to persistent storage
 WALLET_PUBLIC_KEY="<read from snapshot>"  # Replace with actual value from aria-label
@@ -276,7 +289,35 @@ echo "Wallet created. Profile and credentials backed up."
 
 ## Wallet Sidebar Elements
 
-After setup, the sidebar appears on every page. Use `agent-browser snapshot -i` to find these elements:
+The sidebar appears on every page. Use `agent-browser snapshot -i` to find these elements:
+
+### Wallet creation form (shown when no wallet exists)
+
+| Element | ARIA Label | Action |
+|---------|-----------|--------|
+| Create tab | `Create new wallet` | Click to switch to create mode |
+| Import tab | `Import existing wallet` | Click to switch to import mode |
+| Password input | `Vault password` | Fill password (min 8 chars) |
+| Confirm input | `Confirm vault password` | Fill confirm password |
+| Mnemonic input | `Wallet mnemonic phrase` | Fill mnemonic (import mode only) |
+| Create button | `Create wallet` / `Import wallet` | Click to create or import |
+
+### Wallet creation success screen
+
+| Element | ARIA Label | Action |
+|---------|-----------|--------|
+| Address display | `Wallet address: <public-key>` | Read the public key |
+| Mnemonic display | `Wallet mnemonic: <words>` | Read mnemonic (import only) — SAVE THIS |
+| Continue button | `Continue to wallet` | Click to proceed to wallet view |
+
+### Vault unlock (shown when wallet exists but locked)
+
+| Element | ARIA Label | Action |
+|---------|-----------|--------|
+| Password input | `Vault password` | Fill to unlock |
+| Unlock button | `Unlock wallet` | Click to unlock |
+
+### Main wallet view (shown when unlocked)
 
 | Element | ARIA Label | Action |
 |---------|-----------|--------|
@@ -287,14 +328,6 @@ After setup, the sidebar appears on every page. Use `agent-browser snapshot -i` 
 | Network dropdown | `Switch network` | Select network |
 | Approve button | `Approve transaction` / `Approve connection` | Click to approve |
 | Reject button | `Reject transaction` / `Reject connection` | Click to reject |
-| Password input | `Vault password` | Fill to unlock |
-| Unlock button | `Unlock wallet` | Click to unlock |
-
-On the setup success screen only:
-
-| Element | ARIA Label | Action |
-|---------|-----------|--------|
-| Mnemonic display | `Wallet mnemonic: <words>` | Read mnemonic — SAVE THIS |
 
 ## Core Workflows
 
@@ -371,7 +404,7 @@ agent-browser snapshot -i  # Verify network changed
 
 ### Restore wallet from mnemonic (when profile is completely lost)
 
-If the browser profile backup is also gone, you can recreate the wallet from the saved mnemonic:
+If the browser profile backup is also gone, you can recreate the wallet from the saved mnemonic. The sidebar automatically shows the creation/import form when no wallet exists:
 
 ```bash
 source "$HOME/.solana-agent-wallet/credentials.env"
@@ -380,18 +413,23 @@ source "$HOME/.solana-agent-wallet/credentials.env"
 agent-browser open about:blank
 agent-browser wait 2000
 
-# Navigate to setup page
-SETUP_URL=$(agent-browser eval "document.querySelector('meta[name=samui-agent-wallet-setup]')?.content")
-agent-browser open "$SETUP_URL"
-agent-browser wait 1000
+# The sidebar shows the creation form automatically. Switch to import mode.
+agent-browser snapshot -i
+agent-browser click @<import-tab-ref>     # aria-label="Import existing wallet"
+agent-browser wait 500
+agent-browser snapshot -i
 
 # Re-create wallet with the SAME mnemonic → produces the SAME keypair
-agent-browser snapshot -i
-agent-browser fill @<password-ref> "$WALLET_PASSWORD"
-agent-browser fill @<confirm-ref> "$WALLET_PASSWORD"
-agent-browser fill @<mnemonic-ref> "$WALLET_MNEMONIC"
-agent-browser click @<create-button-ref>
+agent-browser fill @<password-ref> "$WALLET_PASSWORD"        # aria-label="Vault password"
+agent-browser fill @<confirm-ref> "$WALLET_PASSWORD"         # aria-label="Confirm vault password"
+agent-browser fill @<mnemonic-ref> "$WALLET_MNEMONIC"        # aria-label="Wallet mnemonic phrase"
+agent-browser click @<import-button-ref>                     # aria-label="Import wallet"
 agent-browser wait 3000
+
+# Click continue to proceed to wallet view
+agent-browser snapshot -i
+agent-browser click @<continue-ref>   # aria-label="Continue to wallet"
+agent-browser wait 1000
 
 # Back up the new profile
 PROFILE_DIR="$(node -e 'console.log(require("os").tmpdir())')/agent-browser-ext-${AGENT_BROWSER_SESSION:-default}"

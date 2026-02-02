@@ -33,6 +33,17 @@ export default defineContentScript({
     })
 
     const api: AgentSidebarApi = {
+      createWallet: async (password: string, mnemonic: string) => {
+        await getDbService().wallet.createWithAccount({
+          derivationPath: `m/44'/501'/0'/0'`,
+          mnemonic: mnemonic.trim(),
+          name: 'Agent Wallet',
+          secret: password,
+        })
+        await sendMessage('vaultUnlock', password)
+        const account = await getDbService().account.active()
+        return { publicKey: account.publicKey }
+      },
       approveRequest: () => {
         const type = pendingRequestType
         if (!type) return
