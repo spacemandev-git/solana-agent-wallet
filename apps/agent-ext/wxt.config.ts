@@ -2,18 +2,12 @@ import { defineConfig } from 'wxt'
 
 export default defineConfig({
   manifest: {
-    content_scripts: [
-      {
-        js: ['content-ui.js'],
-        matches: ['<all_urls>'],
-      },
-    ],
     name: 'Samui Agent Wallet',
     permissions: ['storage'],
     web_accessible_resources: [
       {
         matches: ['*://*/*'],
-        resources: ['injected.js', 'content-ui.js'],
+        resources: ['injected.js'],
       },
     ],
   },
