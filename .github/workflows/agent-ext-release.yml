@@ -1,0 +1,43 @@
+name: Build Agent Extension
+on:
+  push:
+    tags: ['agent-ext-v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/krypton
+
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: '.bun-version'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build agent-ext
+        run: bun run build --filter=agent-ext
+
+      - name: Package extension
+        run: cd apps/agent-ext/.output/chrome-mv3 && zip -r ../../../../agent-ext.zip .
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: agent-ext.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-ext
+          path: agent-ext.zip

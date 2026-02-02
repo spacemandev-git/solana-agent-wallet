@@ -13,6 +13,7 @@ import { accountCreate } from '@workspace/db/account/account-create'
 import { accountFindUnique } from '@workspace/db/account/account-find-unique'
 import { accountReadSecretKey } from '@workspace/db/account/account-read-secret-key'
 import { db } from '@workspace/db/db'
+import { networkFindUnique } from '@workspace/db/network/network-find-unique'
 import { settingFindUnique } from '@workspace/db/setting/setting-find-unique'
 import { walletCreate } from '@workspace/db/wallet/wallet-create'
 import type { WalletCreateInput } from '@workspace/db/wallet/wallet-create-input'
@@ -63,6 +64,18 @@ export const [registerDbService, getDbService] = defineProxyService('DbService',
           },
         ],
       }
+    },
+  },
+  network: {
+    activeEndpoint: async (): Promise<string> => {
+      const activeNetworkId = (await settingFindUnique(db, 'activeNetworkId'))?.value
+      if (activeNetworkId) {
+        const network = await networkFindUnique(db, activeNetworkId)
+        if (network) {
+          return network.endpoint
+        }
+      }
+      return 'https://api.mainnet-beta.solana.com'
     },
   },
   wallet: {

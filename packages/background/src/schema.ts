@@ -20,4 +20,7 @@ export interface Schema {
   signIn(inputs: SolanaSignInInput[]): Promise<SolanaSignInOutput[]>
   signMessage(inputs: SolanaSignMessageInput[]): Promise<SolanaSignMessageOutput[]>
   signTransaction(inputs: SolanaSignTransactionInput[]): Promise<SolanaSignTransactionOutput[]>
+  vaultLock(): Promise<void>
+  vaultStatus(): Promise<{ hasVault: boolean; locked: boolean }>
+  vaultUnlock(password: string): Promise<void>
 }
