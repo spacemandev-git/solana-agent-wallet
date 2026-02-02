@@ -28,13 +28,18 @@ jobs:
         run: bun run build --filter=agent-ext
 
       - name: Package extension
-        run: cd apps/agent-ext/.output/chrome-mv3 && zip -r ../../../../agent-ext.zip .
+        run: |
+          cd apps/agent-ext/.output/chrome-mv3 && zip -r ../../../../agent-ext.zip .
+          cd ../../../..
+          cp skills/solana-wallet/SKILL.md SKILL.md
 
       - name: Upload to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: agent-ext.zip
+          files: |
+            agent-ext.zip
+            SKILL.md
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

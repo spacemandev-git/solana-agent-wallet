@@ -1,58 +1,102 @@
-<p align="center">
-  <a href="https://samui.build">
-    <picture>
-      <source srcset="logo-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="logo-light.svg" media="(prefers-color-scheme: light)">
-      <img src="logo-light.svg" alt="Samui logo">
-    </picture>
-  </a>
-</p>
+# Solana Agent Wallet
 
-<p align="center">Open Source Solana wallet and toolbox for builders 🏟 Cypherpunk Hackathon</p>
+A Solana wallet browser extension built for AI agents. It injects a sidebar with full ARIA labels into every page so agent automation tools like [agent-browser](https://github.com/vercel-labs/agent-browser) can see and interact with all wallet controls via the accessibility tree.
 
-<p align="center">
-    <a href="https://samui.build/go/discord">
-        <img alt="Discord" src="https://img.shields.io/discord/1426222948162863275?style=flat-square&label=discord" />
-    </a>
-    <a href="https://github.com/samui-build/samui-wallet/actions/workflows/ci.yaml">
-        <img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/samui-build/samui-wallet/ci.yaml?style=flat-square&branch=main" />
-    </a>
-</p>
+## What is this?
 
-[![Samui Wallet UI](demo.gif)](https://samui.build)
+This is an **agent skill** — a self-contained package that gives an AI agent the ability to manage a Solana wallet, connect to dApps, and sign transactions, all through a headless browser.
 
----
+The skill file ([`skills/solana-wallet/SKILL.md`](skills/solana-wallet/SKILL.md)) contains everything an AI agent needs to:
 
-## Requirements
+1. Install `agent-browser` and the wallet extension
+2. Create a wallet with a generated mnemonic
+3. **Persist the wallet** across browser restarts (profile backup + credential storage)
+4. **Restore a wallet from mnemonic** if all data is lost
+5. Connect to any Solana dApp (Jupiter, Raydium, Marinade, etc.)
+6. Approve or reject connection and transaction requests
+7. Switch networks (Mainnet, Devnet, Testnet, Localnet)
+8. Unlock the vault after browser restarts
 
-- [FNM](https://github.com/Schniz/fnm) or [NVM](https://github.com/nvm-sh/nvm)
-- [Node](https://nodejs.org)
-- [Bun](https://bun.sh)
+## Using the Skill
 
-## Installation
+Point your AI agent at the skill file:
 
-```bash
-git clone git@github.com:samui-build/samui-wallet.git
-cd samui-wallet
-fnm use # or nvm use
-bun install
-bun dev # or bun --filter=<app-name> dev
+```
+skills/solana-wallet/SKILL.md
 ```
 
-## Documentation
+The SKILL.md is also included in every [GitHub release](https://github.com/spacemandev-git/solana-agent-wallet/releases) alongside the unpacked extension zip.
 
-For more info on how to configure Samui [head over to our docs](https://samui.build).
+### Quick manual setup
 
-## Contributing
+```bash
+# 1. Install agent-browser
+npm install -g agent-browser
+agent-browser install
 
-If you're interested in contributing to Samui, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+# 2. Download the wallet extension
+curl -L -o agent-ext.zip \
+  https://github.com/spacemandev-git/solana-agent-wallet/releases/latest/download/agent-ext.zip
+mkdir -p /tmp/agent-ext
+unzip -o agent-ext.zip -d /tmp/agent-ext
+export AGENT_BROWSER_EXTENSIONS="/tmp/agent-ext"
 
-Samui is currently maintained by [beeman](https://x.com/beeman_nl) and [tobeycodes](https://x.com/tobeycodes), with support from a number of contributors.
+# 3. Launch browser and set up wallet
+agent-browser open about:blank
+agent-browser wait 2000
+SETUP_URL=$(agent-browser eval "document.querySelector('meta[name=samui-agent-wallet-setup]')?.content")
+agent-browser open "$SETUP_URL"
+```
 
-<a href="https://github.com/samui-build/samui-wallet/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=samui-build/samui-wallet" />
-</a>
+From there, use `agent-browser snapshot -i` to discover interactive elements and fill the setup form. See the full [SKILL.md](skills/solana-wallet/SKILL.md) for detailed workflows.
 
----
+### Important: Wallet persistence
 
-**Join our community** [Discord](https://samui.build/go/discord) | [X.com](https://samui.build/go/x)
+The browser profile is stored in a **temp directory** that can be wiped on reboot. The skill instructs the agent to:
+
+- Save the **mnemonic** and **password** to `~/.solana-agent-wallet/credentials.env`
+- Back up the **browser profile** to `~/.solana-agent-wallet/browser-profile/`
+- Restore the profile before each browser launch
+
+If all data is lost, the wallet can be recreated from the saved mnemonic (same mnemonic = same keypair = same address). See the [SKILL.md](skills/solana-wallet/SKILL.md) "CRITICAL: Wallet Persistence" section for full details.
+
+## Architecture
+
+```
+solana-agent-wallet/
+├── apps/agent-ext/          # WXT browser extension (Chrome MV3)
+├── packages/vault/          # AES-256-GCM encryption with PBKDF2 key derivation
+├── packages/agent-ui/       # Shadow DOM sidebar with ARIA labels
+├── packages/background/     # Extension messaging, services, DB
+├── packages/wallet-standard/ # Solana Wallet Standard registration
+├── packages/db/             # IndexedDB storage (Dexie)
+├── packages/env/            # Environment configuration
+├── packages/keypair/        # Key derivation from mnemonic
+└── skills/solana-wallet/    # Agent skill (SKILL.md + references + templates)
+```
+
+Key design decisions:
+
+- **Shadow DOM sidebar** — injected into every page, isolated from host page styles, visible to Playwright's accessibility tree
+- **ARIA labels on all controls** — agents discover elements via `agent-browser snapshot -i` without needing CSS selectors
+- **Vault encryption** — secret keys encrypted at rest with AES-256-GCM (PBKDF2, 600k iterations). Password held in `chrome.storage.session` (memory-only)
+- **No popup windows** — signing requests appear in the sidebar so headless automation works without window switching
+
+## Building from Source
+
+```bash
+git clone https://github.com/spacemandev-git/solana-agent-wallet
+cd solana-agent-wallet
+bun install
+bun run build --filter=agent-ext
+```
+
+The unpacked extension is at `apps/agent-ext/.output/chrome-mv3`.
+
+## Releases
+
+Pre-built extensions and the SKILL.md are published to [GitHub Releases](https://github.com/spacemandev-git/solana-agent-wallet/releases) on every `agent-ext-v*` tag.
+
+## License
+
+Based on [Samui Wallet](https://samui.build) by [beeman](https://x.com/beeman_nl) and [tobeycodes](https://x.com/tobeycodes).

@@ -73,9 +73,16 @@ function SetupForm() {
                 {publicKey}
               </output>
             </div>
+            <div style={{ ...styles.field, marginTop: '16px' }}>
+              <span style={styles.label}>Mnemonic (save this — needed to restore wallet)</span>
+              <output aria-label={`Wallet mnemonic: ${mnemonic.trim()}`} style={styles.publicKey}>
+                {mnemonic.trim()}
+              </output>
+            </div>
             <p style={styles.hint}>
-              Fund this address with SOL, then navigate to any Solana dApp. The wallet sidebar will appear
-              automatically.
+              Save the mnemonic above securely. You will need it to restore the wallet if browser data is lost.
+              Fund the public key address with SOL, then navigate to any Solana dApp. The wallet sidebar will
+              appear automatically.
             </p>
           </div>
         ) : (
